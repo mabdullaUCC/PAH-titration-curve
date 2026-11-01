@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PAH Transport Maximum (Tm)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#fff;--fg:#111;--bar:#f1f1f1;--bd:#ccc}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1b1b1b;--fg:#eee;--bar:#2a2a2a;--bd:#555}}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Helvetica,Arial,sans-serif}
+#w{max-width:900px;margin:0 auto;padding:8px}
+svg{width:100%;height:auto;display:block;background:#fff;border-radius:6px}
+text{font-family:Helvetica,Arial,sans-serif;fill:#222}
+#bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--bar);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:8px}
+.r{flex-basis:100%;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.r input{flex:1;min-width:140px;accent-color:#e8590c}
+button{font:inherit;padding:6px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+button.on{background:#e8590c;color:#fff;border-color:#e8590c}
+#note{margin-top:8px;font-size:16px;line-height:1.5;padding:10px 12px;border-radius:8px;background:var(--bar);border:1px solid var(--bd)}
+</style></head><body><div id="w">
+<div id="bar"><button id="p0">Low PAH</button><button id="p1">Near Tm</button><button id="p2">High PAH</button><button id="sw">▶ Sweep</button>
+<span class="r"><b>PAH in plasma</b><input id="sl" type="range" min="0" max="1" step="0.001" value="0.1"><b id="pv" style="min-width:90px"></b></span>
+<span class="r"><b>T<sub>M</sub></b><input id="tm" type="range" min="30" max="160" step="1" value="80"><b id="tmv" style="min-width:90px"></b><b>GFR</b><input id="gf" type="range" min="60" max="180" step="1" value="128"><b id="gfv" style="min-width:90px"></b><button id="rs">Reset</button></span></div>
+<svg id="s" viewBox="0 0 900 1140"></svg>
+<div id="note"></div></div>
+<script>
+const NS='http://www.w3.org/2000/svg',$=i=>document.getElementById(i),S=$('s');
+const mk=(p,t,a={},h)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(h!=null)e.innerHTML=h;p.appendChild(e);return e};
+let TM=80,GFR=128;const COL='#e8590c';let Pa=.125;
+const Fm=P=>GFR*P,Sm=P=>{const lin=4*GFR*P,a=.8*TM;return lin<=a?lin:a+(TM-a)*(1-Math.exp(-(lin-a)/(TM-a)))},Em=P=>Fm(P)+Sm(P);
+// ---------- nephron ----------
+const NG=mk(S,'g',{transform:'translate(0 14)'});
+mk(NG,'circle',{cx:300,cy:185,r:98,fill:'#f9ecb8',stroke:'#8a7a40','stroke-width':6});
+const TP='M300 270V400';
+mk(NG,'path',{d:TP,stroke:'#8a7a40','stroke-width':38,fill:'none'});mk(NG,'path',{d:TP,stroke:'#f9ecb8','stroke-width':28,fill:'none'});
+mk(NG,'path',{d:'M300 400V436',stroke:'#444','stroke-width':3,fill:'none'});mk(NG,'path',{d:'M290 428l10 14l10-14z',fill:'#444'});
+const AFF=[[0,40],[240,40],[290,80],[300,125]],EFF=[[300,150],[345,165],[420,165],[450,195],[450,280],[430,310],[370,330],[370,420],[400,440],[860,440]];
+const vp=pts=>pts.map((p,i)=>(i?'L':'M')+p[0]+' '+p[1]).join('');
+const tube=(pts,w)=>{mk(NG,'path',{d:vp(pts),stroke:'#a8322f',fill:'none','stroke-width':w+4,'stroke-linejoin':'round','stroke-linecap':'butt'});mk(NG,'path',{d:vp(pts),stroke:'#ef6b66',fill:'none','stroke-width':w,'stroke-linejoin':'round'})};
+tube(AFF,18);tube(EFF,16);
+mk(NG,'circle',{cx:300,cy:150,r:57,fill:'none',stroke:'#8a7a40','stroke-width':2.5});mk(NG,'circle',{cx:300,cy:150,r:50,fill:'#ef6b66',stroke:'#a8322f','stroke-width':3});[[16,'58 42',20],[29,'113 68',110],[41,'160 98',200]].forEach(([r,da,rot])=>mk(NG,'circle',{cx:300,cy:150,r,fill:'none',stroke:'#a8322f','stroke-width':3,'stroke-dasharray':da,'stroke-linecap':'round',transform:`rotate(${rot} 300 150)`}));mk(NG,'circle',{cx:300,cy:150,r:5,fill:'#a8322f'});
+
+const L=(x,y,t,o={})=>mk(NG,'text',{x,y,style:'font-size:17px',...o},t);
+L(10,22,'100% of PAH entering kidney');L(400,22,'Glomerular capillaries');L(468,262,'Peritubular capillaries');L(640,418,'Renal vein →');L(300,466,'Excreted PAH',{style:'font-size:17px;font-weight:700','text-anchor':'middle'});
+L(214,262,'Bowman’s space',{style:'font-size:14px;fill:#777'});
+const tF=L(318,300,'',{style:'font-size:18px;font-weight:700'}),tS=L(250,372,'',{style:'font-size:18px;font-weight:700','text-anchor':'end'}),tX=L(500,332,'',{style:'font-size:15px;fill:#666'});
+const bg=mk(NG,'g');
+const cum=pl=>{let c=[0];for(let i=1;i<pl.length;i++)c.push(c[i-1]+Math.hypot(pl[i][0]-pl[i-1][0],pl[i][1]-pl[i-1][1]));return c};
+const at=(pl,c,d)=>{let k=1;while(k<c.length-1&&c[k]<d)k++;const f=Math.min(1,Math.max(0,(d-c[k-1])/(c[k]-c[k-1])));return[pl[k-1][0]+(pl[k][0]-pl[k-1][0])*f,pl[k-1][1]+(pl[k][1]-pl[k-1][1])*f]};
+const FILT=[[300,125],[300,185],[300,270],[300,436]],P_AFF=AFF.concat([[300,150]]);
+const paths={aff:[P_AFF,cum(P_AFF)],filt:[FILT,cum(FILT)],eff:[EFF,cum(EFF)]};
+const dSec0=cum(EFF)[6]+10,dSec1=cum(EFF)[7]-10;
+let beads=[],acc=0,tallyF=0,tallyS=0,tallyV=0;
+function spawn(){const e=mk(bg,'circle',{r:5.2,fill:COL,stroke:'#5a2200','stroke-width':1.2});beads.push({e,p:'aff',d:0,sec:false,ck:false})}
+// ---------- graph ----------
+const GG=mk(S,'g',{transform:'translate(0 -120)'});
+const gx=P=>110+720*P,gy=v=>1180-v*2.8;
+mk(GG,'path',{d:`M110 ${gy(200)}V1180H830`,fill:'none',stroke:'#222','stroke-width':3});
+[0,.2,.4,.6,.8,1].forEach(p=>{mk(GG,'path',{d:`M${gx(p)} 1180v10`,stroke:'#222','stroke-width':2.5});mk(GG,'text',{x:gx(p),y:1218,'text-anchor':'middle',style:'font-size:20px'},p)});
+[.1,.3,.5,.7,.9].forEach(p=>mk(GG,'path',{d:`M${gx(p)} 1180v6`,stroke:'#222','stroke-width':2}));
+[0,40,80,120,160,200].forEach(v=>{mk(GG,'path',{d:`M100 ${gy(v)}h10`,stroke:'#222','stroke-width':2.5});mk(GG,'text',{x:92,y:gy(v)+7,'text-anchor':'end',style:'font-size:20px'},v)});
+mk(GG,'text',{x:470,y:1252,'text-anchor':'middle',style:'font-size:22px'},'PAH concentration in plasma (mg/ml)');
+mk(GG,'text',{transform:'translate(36 900) rotate(-90)','text-anchor':'middle',style:'font-size:20px'},'p-Aminohippuric acid (rate, mg/min)');
+const dy=mk(GG,'g');
+function curve(f,st){let d='';for(let i=0;i<=200;i++){const P=i/200,v=f(P);if(v>200)break;d+=(i?'L':'M')+gx(P)+' '+gy(v)}return mk(dy,'path',{d,fill:'none','stroke-linecap':'round',...st})}
+function drawDyn(){dy.innerHTML='';Pa=.8*TM/(4*GFR);curve(P=>5*GFR*P,{stroke:'#999','stroke-width':2.5,'stroke-dasharray':'7 6'});const P190=190/(5*GFR);mk(dy,'text',{x:gx(P190)+14,y:gy(192),style:'font-size:17px;fill:#777'},'delivered to kidney');
+ mk(dy,'path',{d:`M${gx(Pa)} ${gy(0)}V${gy(200)}`,stroke:'#c0392b','stroke-width':2,'stroke-dasharray':'2 5',fill:'none'});mk(dy,'text',{transform:`translate(${gx(Pa)-8} ${gy(196)}) rotate(-90)`,'text-anchor':'end',style:'font-size:16px;fill:#c0392b'},'PAH appears in renal vein →');
+ curve(Fm,{stroke:'#1fa05a','stroke-width':4});curve(Sm,{stroke:'#7b2d9b','stroke-width':4});curve(Em,{stroke:'#e02424','stroke-width':4});
+ mk(dy,'path',{d:`M110 ${gy(TM)}H830`,stroke:'#111','stroke-width':2.5,'stroke-dasharray':'8 6',fill:'none'});
+ mk(dy,'text',{x:gx(.3),y:gy(TM)-12,style:'font-size:22px'},`T<tspan font-size="15" dy="5">M</tspan><tspan dy="-5"> = ${TM} mg/min</tspan>`);
+ mk(dy,'text',{x:gx(.86),y:gy(Sm(.86))-14,'text-anchor':'middle',style:'font-size:22px'},'Secreted');
+ mk(dy,'text',{x:gx(.5),y:gy(Fm(.5))+34,'text-anchor':'middle',transform:`rotate(${-Math.atan2(GFR*2.8,720)*180/Math.PI} ${gx(.5)} ${gy(Fm(.5))+34})`,style:'font-size:22px'},'Filtered');
+ mk(dy,'text',{x:gx(.3),y:gy(Em(.3))-18,'text-anchor':'middle',transform:`rotate(${-Math.atan2((Em(.4)-Em(.2))*2.8,720*.2)*180/Math.PI} ${gx(.3)} ${gy(Em(.3))-18})`,style:'font-size:22px'},'Excreted')}
+drawDyn();
+const mline=mk(GG,'path',{stroke:'#555','stroke-width':2,'stroke-dasharray':'6 5',fill:'none'});
+const dF=mk(GG,'circle',{r:7,fill:'#1fa05a',stroke:'#fff','stroke-width':2.5}),dS=mk(GG,'circle',{r:7,fill:'#7b2d9b',stroke:'#fff','stroke-width':2.5}),dE=mk(GG,'circle',{r:7,fill:'#e02424',stroke:'#fff','stroke-width':2.5});
+mk(GG,'rect',{x:500,y:1004,width:300,height:158,rx:10,fill:'#fff',opacity:.9,stroke:'#999'});
+const rt=[0,1,2,3,4].map(k=>mk(GG,'text',{x:514,y:1034+k*29,style:'font-size:19px'}));
+// ---------- logic ----------
+let sweep=false,sT=0,Pd=.1,last=performance.now();
+const setSl=v=>{$('sl').value=v;stopSw()};
+function stopSw(){sweep=false;$('sw').textContent='▶ Sweep';$('sw').className=''}
+$('sw').onclick=()=>{sweep=!sweep;sT=performance.now();$('sw').textContent=sweep?'■ Stop':'▶ Sweep';$('sw').className=sweep?'on':''};
+$('p0').onclick=()=>setSl(.1);
+$('p1').onclick=()=>setSl(0.20); // Set to exactly the Tm threshold
+$('p2').onclick=()=>setSl(1);
+$('sl').oninput=stopSw;
+function ctl(){TM=+$('tm').value;GFR=+$('gf').value;$('tmv').textContent=TM+' mg/min';$('gfv').textContent=GFR+' mL/min';drawDyn()}
+$('tm').oninput=$('gf').oninput=ctl;$('rs').onclick=()=>{$('tm').value=80;$('gf').value=128;$('sl').value=.1;ctl();stopSw()};ctl();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+ let tg=+$('sl').value;if(sweep){tg=((now-sT)/14000)%1;$('sl').value=tg;Pd=tg}else Pd+=(tg-Pd)*(1-Math.exp(-dt*9));
+ const P=Pd,F=Fm(P),Sx=Sm(P),E=F+Sx,del=5*GFR*P,FF=.2,cv=Math.max(0,(del-E)/(5*GFR));
+ $('pv').textContent=P.toFixed(2)+' mg/ml';
+ mline.setAttribute('d',`M${gx(P)} 1180V${gy(200)}`);[[dF,F],[dS,Sx],[dE,E]].forEach(([c,v])=>{c.setAttribute('cx',gx(P));c.setAttribute('cy',gy(Math.min(v,200)));c.setAttribute('opacity',v>200?0:1)});
+ rt[0].textContent='PAH in plasma: '+P.toFixed(2)+' mg/ml';rt[1].textContent='Filtered: '+F.toFixed(0)+' mg/min';rt[2].textContent='Secreted: '+Sx.toFixed(0)+' mg/min';rt[3].textContent='Excreted: '+E.toFixed(0)+' mg/min';rt[4].textContent='Renal vein PAH: '+cv.toFixed(2)+' mg/ml';
+ const pf=E>0?F/E*100:0,ps=100-pf;tF.textContent=E>0?'filtered '+pf.toFixed(0)+'%':'';tS.textContent=E>0?'secreted '+ps.toFixed(0)+'%':'';
+ tX.textContent=P>0?'cleared '+(E/del*100).toFixed(0)+'% · vein PAH '+cv.toFixed(2)+' mg/ml':'';
+ const q=Math.max(0,Math.min(1,Sx/Math.max(1e-6,del-F)));
+ acc+=dt*(.6+5*P);while(acc>=1){acc--;spawn()}
+ for(const b of beads){const v=95*dt;b.d+=v;const [pl,c]=paths[b.p]||[null,[0]],tot=c[c.length-1];
+  if(b.p=='eff'&&!b.ck&&b.d>=dSec0){b.ck=true;if(Math.random()<q){const [x,y]=at(pl,c,b.d);b.p='sec';b.sx=x;b.sy=y;b.sd=0}}
+  if(b.p=='sec'){b.sd+=v;if(b.sx>301){b.sx=Math.max(300,b.sx-v*.9);b.e.setAttribute('cx',b.sx);b.e.setAttribute('cy',b.sy);b.e.setAttribute('r',6.5);b.e.setAttribute('stroke','#fff')}
+   else{b.sy+=v;b.e.setAttribute('cx',300);b.e.setAttribute('cy',b.sy);if(b.sy>=436)b.dead=true}continue}
+  if(b.d>=tot){if(b.p=='aff'){b.p=Math.random()<FF?'filt':'eff';b.d=0;b.ck=false}else b.dead=true;continue}
+  const [x,y]=at(pl,c,b.d);b.e.setAttribute('cx',x);b.e.setAttribute('cy',y)}
+ beads=beads.filter(b=>{if(b.dead)b.e.remove();return !b.dead});
+ $('note').innerHTML=`<b>PAH:</b> at low plasma levels secretion is about 4× the filtration rate, so 20% of the PAH delivered to the kidney is filtered and 80% is secreted. All delivered PAH is removed and the renal vein PAH concentration is zero. As plasma PAH rises, secretion increases until the carriers saturate and reach the transport maximum (T<sub>M</sub> = ${TM} mg/min). PAH first appears in the renal vein at the start of the splay region (≈ ${Pa.toFixed(2)} mg/ml); beyond that, extra PAH is only filtered. Now: ${pf.toFixed(0)}% of excreted PAH is filtered, ${ps.toFixed(0)}% is secreted, renal vein PAH ${cv.toFixed(2)} mg/ml.`;
+ requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script></body></html>
